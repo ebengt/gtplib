@@ -87,6 +87,26 @@
 	  mnc
 	 }).
 
+%% For types redirection_request and redirection_response
+-record( node_addresses, {
+	instance = 0,
+	node,
+	alternative_node
+}).
+
+%% For types data_record_transfer_request and data_record_transfer_response
+-record( packet_transfer, {
+	instance = 0,
+	%% Below used when Type is data_record_transfer_request
+	command,
+	datas=[],
+	%% Below only used when command is not Send Data Record Packet
+	releaseds=[],
+	cancelleds=[],
+	%% Below used when Type is data_record_transfer_response
+	respondeds=[]
+}).
+
 %% -include("gtp_packet_v1_gen.hrl").
 
 -record(cause, {

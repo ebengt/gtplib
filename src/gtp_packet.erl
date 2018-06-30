@@ -50,6 +50,11 @@ decode_ies(#gtp{version = v2, ie = IEs} = Msg, #{ies := map}) ->
 decode_ies(Msg, _) ->
     Msg.
 
+
+encode( #gtp{version = V, type = Type, seq_no = SeqNo, ie = IEs} )
+	when V =:= prime_v0; V =:= prime_v0_short; V =:= prime_v1; V =:= prime_v2 ->
+    gtplib_prime:encode( V, Type, SeqNo, IEs );
+
 encode(#gtp{version = v1, type = Type, tei = TEI, seq_no = SeqNo,
 	    n_pdu = NPDU, ext_hdr = ExtHdr, ie = IEs}) ->
     Flags = encode_gtp_v1_hdr_flags(SeqNo, NPDU, ExtHdr),
@@ -94,6 +99,19 @@ pretty_print(Record, N) ->
 %%====================================================================
 %% Helpers
 %%====================================================================
+
+%% version 0 long, e => 0:3, 0:1, 7:3, 0:1, Data is a subset of v2.
+decode_header( <<16#e:8, Type:8, Length:16, SeqNo0:16, _:14/bytes, Data0:Length/bytes>> ) ->
+	gtplib_prime:decode( prime_v0, Type, Length, SeqNo0, Data0 );
+%% version 0 short, f => 0:3, 0:1, 7:3, 1:1, Data is a subset of v2.
+decode_header( <<16#f:8, Type:8, Length:16, SeqNo0:16, Data0:Length/bytes>> ) ->
+	gtplib_prime:decode( prime_v0_short, Type, Length, SeqNo0, Data0 );
+%% version 1, 2e => 1:3, 0:1, 7:3, 0:1, Data is a subset of v2.
+decode_header( <<16#2e:8, Type:8, Length:16, SeqNo0:16, _:14/bytes, Data0:Length/bytes>> ) ->
+	gtplib_prime:decode( prime_v1, Type, Length, SeqNo0, Data0 );
+%% version 2, 4e => 2:3, 0:1, 7:3, 0:1
+decode_header( <<16#4e:8, Type:8, Length:16, SeqNo0:16, Data0:Length/bytes>> ) ->
+	gtplib_prime:decode( prime_v2, Type, Length, SeqNo0, Data0 );
 
 decode_header(<<1:3, 1:1, _:1, E:1, S:1, PN:1, Type:8, Length:16, TEI:32/integer,
 		SeqNo0:16, NPDU0:8, ExtHdrType:8, Data0/binary>>)
@@ -778,9 +796,15 @@ enum_value(reactivation_requested) -> 6;
 enum_value(pdp_address_inactivity_timer_expires) -> 7;
 enum_value(network_failure) -> 8;
 enum_value(qos_parameter_mismatch) -> 9;
+enum_value(system_failure) -> 59;
+enum_value(the_transmit_buffers_are_becoming_full) -> 60;
+enum_value(the_receive_buffers_are_becoming_full) -> 61;
+enum_value(another_node_is_about_to_go_down) -> 62;
+enum_value(this_node_is_about_to_go_down) -> 63;
 enum_value(request_accepted) -> 128;
 enum_value(new_pdp_type_due_to_network_preference) -> 129;
 enum_value(new_pdp_type_due_to_single_address_bearer_only) -> 130;
+enum_value(cdr_decoding_error) -> 177;
 enum_value(non_existent) -> 192;
 enum_value(invalid_message_format) -> 193;
 enum_value(imsi_imei_not_known) -> 194;
@@ -821,6 +845,10 @@ enum_value(collision_with_network_initiated_request) -> 228;
 enum_value(apn_congestion) -> 229;
 enum_value(bearer_handling_not_supported) -> 230;
 enum_value(target_access_restricted_for_the_subscriber) -> 231;
+enum_value(request_related_to_possibly_duplicated_packets_already_fulfilled) -> 252;
+enum_value(request_already_fulfilled) -> 253;
+enum_value(sequence_numbers_of_released_cancelled_packets_ie_incorrect) -> 254;
+enum_value(request_not_fulfilled) -> 255;
 enum_value(0) -> request_imsi;
 enum_value(1) -> request_imei;
 enum_value(2) -> request_imsi_and_imei;
@@ -831,9 +859,15 @@ enum_value(6) -> reactivation_requested;
 enum_value(7) -> pdp_address_inactivity_timer_expires;
 enum_value(8) -> network_failure;
 enum_value(9) -> qos_parameter_mismatch;
+enum_value(59) -> system_failure;
+enum_value(60) -> the_transmit_buffers_are_becoming_full;
+enum_value(61) -> the_receive_buffers_are_becoming_full;
+enum_value(62) -> another_node_is_about_to_go_down;
+enum_value(63) -> this_node_is_about_to_go_down;
 enum_value(128) -> request_accepted;
 enum_value(129) -> new_pdp_type_due_to_network_preference;
 enum_value(130) -> new_pdp_type_due_to_single_address_bearer_only;
+enum_value(177) -> cdr_decoding_error;
 enum_value(192) -> non_existent;
 enum_value(193) -> invalid_message_format;
 enum_value(194) -> imsi_imei_not_known;
@@ -874,6 +908,10 @@ enum_value(228) -> collision_with_network_initiated_request;
 enum_value(229) -> apn_congestion;
 enum_value(230) -> bearer_handling_not_supported;
 enum_value(231) -> target_access_restricted_for_the_subscriber;
+enum_value(252) -> request_related_to_possibly_duplicated_packets_already_fulfilled;
+enum_value(253) -> request_already_fulfilled;
+enum_value(254) -> sequence_numbers_of_released_cancelled_packets_ie_incorrect;
+enum_value(255) -> request_not_fulfilled;
 enum_value(X) when is_integer(X) -> X.
 
 decode_v1_element(<<M_value:8/integer>>, 1, Instance) ->
